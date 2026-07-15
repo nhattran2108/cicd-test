@@ -9,7 +9,7 @@ app.get('/', (req, res) => {
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>sample-app</title>
+<title>sample-app-v1</title>
 <style>
   body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
   .card { background: #1e293b; padding: 2.5rem 3rem; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; }
@@ -22,7 +22,7 @@ app.get('/', (req, res) => {
 </head>
 <body>
   <div class="card">
-    <h1>sample-app</h1>
+    <h1>sample-app-v1</h1>
     <span class="badge">running</span>
     <dl>
       <dt>Version</dt><dd>${version}</dd>
