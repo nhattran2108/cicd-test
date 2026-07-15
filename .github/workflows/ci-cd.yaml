@@ -10,12 +10,13 @@ on:
 permissions:
   contents: write
   packages: write
+  security-events: write
 
 env:
   REGISTRY: ghcr.io
 
 jobs:
-  build-and-push:
+  lint-format-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -32,9 +33,60 @@ jobs:
         working-directory: app
         run: npm install
 
+      - name: Lint (ESLint)
+        working-directory: app
+        run: npm run lint
+
+      - name: Format check (Prettier)
+        working-directory: app
+        run: npm run format:check
+
       - name: Run tests
         working-directory: app
         run: npm test
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trivy secret scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: app
+          scanners: secret
+          format: sarif
+          output: trivy-secret.sarif
+          exit-code: '1'
+
+      - name: Upload secret scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-secret.sarif
+
+  sast:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+
+  build-scan-push:
+    needs: [lint-format-test, secret-scan, sast]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Compute lowercase image name
         id: image
@@ -49,14 +101,51 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build image (local)
         uses: docker/build-push-action@v6
         with:
           context: app
-          push: true
+          push: false
+          load: true
           tags: |
             ${{ steps.image.outputs.name }}:${{ github.sha }}
             ${{ steps.image.outputs.name }}:latest
+
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          scanners: vuln
+          format: sarif
+          output: trivy-image.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+
+      - name: Upload vulnerability scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-image.sarif
+
+      - name: Generate SBOM (CycloneDX)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          format: cyclonedx
+          output: sbom.cyclonedx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: sbom.cyclonedx.json
+
+      - name: Push image
+        run: |
+          docker push ${{ steps.image.outputs.name }}:${{ github.sha }}
+          docker push ${{ steps.image.outputs.name }}:latest
 
       - name: Update image tag in manifests
         working-directory: manifests
