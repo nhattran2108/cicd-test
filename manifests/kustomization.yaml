@@ -1,21 +1,21 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - db-secret.yaml
-  - db-pvc.yaml
-  - db-deployment.yaml
-  - db-service.yaml
-  - backend-deployment.yaml
-  - backend-service.yaml
-  - frontend-deployment.yaml
-  - frontend-service.yaml
+- db-secret.yaml
+- db-pvc.yaml
+- db-deployment.yaml
+- db-service.yaml
+- backend-deployment.yaml
+- backend-service.yaml
+- frontend-deployment.yaml
+- frontend-service.yaml
 images:
-  - name: todolist-db
-    newName: ghcr.io/nhattran2108/cicd-test-db
-    newTag: latest
-  - name: todolist-backend
-    newName: ghcr.io/nhattran2108/cicd-test-backend
-    newTag: latest
-  - name: todolist-frontend
-    newName: ghcr.io/nhattran2108/cicd-test-frontend
-    newTag: latest
+- name: todolist-backend
+  newName: ghcr.io/nhattran2108/cicd-test-backend
+  newTag: 88691c2cc361db4eb7dc8c6640fb2fdfcc2fab26
+- name: todolist-db
+  newName: ghcr.io/nhattran2108/cicd-test-db
+  newTag: 88691c2cc361db4eb7dc8c6640fb2fdfcc2fab26
+- name: todolist-frontend
+  newName: ghcr.io/nhattran2108/cicd-test-frontend
+  newTag: 88691c2cc361db4eb7dc8c6640fb2fdfcc2fab26
