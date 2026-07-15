@@ -1,7 +1,7 @@
 {
-  "name": "sample-app",
+  "name": "todolist-backend",
   "version": "1.0.0",
-  "description": "Minimal Express app for CI/CD demo",
+  "description": "Todolist backend API (Express + PostgreSQL)",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -11,7 +11,8 @@
   },
   "license": "MIT",
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "pg": "^8.12.0"
   },
   "devDependencies": {
     "eslint": "^8.57.0",

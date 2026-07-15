@@ -1,0 +1,30 @@
+services:
+  db:
+    build: ./services/db
+    environment:
+      POSTGRES_USER: todolist
+      POSTGRES_PASSWORD: local-dev-only
+      POSTGRES_DB: todolist
+    ports:
+      - '5432:5432'
+
+  backend:
+    build: ./services/backend
+    environment:
+      PORT: '3001'
+      PGHOST: db
+      PGPORT: '5432'
+      PGUSER: todolist
+      PGPASSWORD: local-dev-only
+      PGDATABASE: todolist
+    depends_on:
+      - db
+    ports:
+      - '3001:3001'
+
+  frontend:
+    build: ./services/frontend
+    depends_on:
+      - backend
+    ports:
+      - '8080:80'

@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: sample-app
+  name: todolist
   namespace: argocd
 spec:
   project: default
@@ -11,7 +11,7 @@ spec:
     path: manifests
   destination:
     server: https://kubernetes.default.svc
-    namespace: sample-app
+    namespace: todolist
   syncPolicy:
     automated:
       prune: true

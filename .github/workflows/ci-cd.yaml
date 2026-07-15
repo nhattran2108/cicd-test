@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'app/**'
+      - 'services/**'
       - '.github/workflows/ci-cd.yaml'
 
 permissions:
@@ -27,22 +27,22 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: app/package.json
+          cache-dependency-path: services/backend/package.json
 
       - name: Install deps
-        working-directory: app
+        working-directory: services/backend
         run: npm install
 
       - name: Lint (ESLint)
-        working-directory: app
+        working-directory: services/backend
         run: npm run lint
 
       - name: Format check (Prettier)
-        working-directory: app
+        working-directory: services/backend
         run: npm run format:check
 
       - name: Run tests
-        working-directory: app
+        working-directory: services/backend
         run: npm test
 
   secret-scan:
@@ -55,7 +55,7 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
-          scan-ref: app
+          scan-ref: services
           scanners: secret
           format: sarif
           output: trivy-secret.sarif
@@ -88,12 +88,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Compute lowercase image name
-        id: image
-        run: echo "name=${REGISTRY}/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]' >> "$GITHUB_OUTPUT"
-        env:
-          REGISTRY: ${{ env.REGISTRY }}
-
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -101,61 +95,56 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build image (local)
-        uses: docker/build-push-action@v6
-        with:
-          context: app
-          push: false
-          load: true
-          tags: |
-            ${{ steps.image.outputs.name }}:${{ github.sha }}
-            ${{ steps.image.outputs.name }}:latest
+      - name: Install Trivy
+        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
 
-      - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: image
-          image-ref: ${{ steps.image.outputs.name }}:${{ github.sha }}
-          scanners: vuln
-          format: sarif
-          output: trivy-image.sarif
-          severity: CRITICAL,HIGH
-          exit-code: '0'
+      - name: Build, scan, and push service images
+        run: |
+          set -e
+          IMAGE_BASE=$(echo "${REGISTRY}/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
+          mkdir -p sarif sbom
+
+          for svc in db backend frontend; do
+            image="${IMAGE_BASE}-${svc}"
+            echo "== Building ${svc} =="
+            docker build -t "${image}:${GITHUB_SHA}" -t "${image}:latest" "services/${svc}"
+
+            echo "== Scanning ${svc} for vulnerabilities =="
+            trivy image --scanners vuln --severity CRITICAL,HIGH --format sarif \
+              --output "sarif/${svc}.sarif" --exit-code 0 "${image}:${GITHUB_SHA}"
+
+            echo "== Generating SBOM for ${svc} =="
+            trivy image --format cyclonedx --output "sbom/${svc}.cyclonedx.json" "${image}:${GITHUB_SHA}"
+
+            echo "== Pushing ${svc} =="
+            docker push "${image}:${GITHUB_SHA}"
+            docker push "${image}:latest"
+          done
 
       - name: Upload vulnerability scan results
         if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-image.sarif
+          sarif_file: sarif
 
-      - name: Generate SBOM (CycloneDX)
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: image
-          image-ref: ${{ steps.image.outputs.name }}:${{ github.sha }}
-          format: cyclonedx
-          output: sbom.cyclonedx.json
-
-      - name: Upload SBOM artifact
+      - name: Upload SBOM artifacts
         uses: actions/upload-artifact@v4
         with:
           name: sbom-${{ github.sha }}
-          path: sbom.cyclonedx.json
+          path: sbom
 
-      - name: Push image
-        run: |
-          docker push ${{ steps.image.outputs.name }}:${{ github.sha }}
-          docker push ${{ steps.image.outputs.name }}:latest
-
-      - name: Update image tag in manifests
+      - name: Update image tags in manifests
         working-directory: manifests
         run: |
+          IMAGE_BASE=$(echo "${REGISTRY}/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
           curl -sLo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.4.3/kustomize_v5.4.3_linux_amd64.tar.gz
           tar -xzf kustomize.tar.gz
-          ./kustomize edit set image sample-app=${{ steps.image.outputs.name }}:${{ github.sha }}
+          ./kustomize edit set image todolist-db="${IMAGE_BASE}-db:${GITHUB_SHA}"
+          ./kustomize edit set image todolist-backend="${IMAGE_BASE}-backend:${GITHUB_SHA}"
+          ./kustomize edit set image todolist-frontend="${IMAGE_BASE}-frontend:${GITHUB_SHA}"
           rm -f kustomize kustomize.tar.gz
 
-      - name: Commit and push updated manifest
+      - name: Commit and push updated manifests
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -164,7 +153,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No manifest changes to commit"
           else
-            git commit -m "ci: deploy ${{ github.sha }}"
+            git commit -m "ci: deploy ${GITHUB_SHA}"
             git rebase origin/main
             git push origin main
           fi
