@@ -70,12 +70,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
           git add manifests/kustomization.yaml
           if git diff --cached --quiet; then
             echo "No manifest changes to commit"
           else
-            git commit -m "ci: deploy ${{ github.sha }}"
-            git fetch origin main
             git rebase origin/main
-            git push
+            git commit -m "ci: deploy ${{ github.sha }}"
+            git push origin main
           fi
