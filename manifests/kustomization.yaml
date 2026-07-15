@@ -5,5 +5,5 @@ resources:
   - service.yaml
 images:
   - name: sample-app
-    newName: ghcr.io/OWNER/REPO
+    newName: ghcr.io/nhattran2108/cicd-test.git
     newTag: latest
