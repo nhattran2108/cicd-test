@@ -6,4 +6,4 @@ resources:
 images:
 - name: sample-app
   newName: ghcr.io/nhattran2108/cicd-test
-  newTag: e6f23a7cef32f9ffa5b04f85488045f59012b734
+  newTag: b88aa4199907d7703763c7207272e518be11bce5
