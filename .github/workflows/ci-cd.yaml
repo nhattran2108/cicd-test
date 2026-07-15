@@ -75,7 +75,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No manifest changes to commit"
           else
-            git rebase origin/main
             git commit -m "ci: deploy ${{ github.sha }}"
+            git rebase origin/main
             git push origin main
           fi
