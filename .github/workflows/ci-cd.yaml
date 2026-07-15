@@ -75,5 +75,7 @@ jobs:
             echo "No manifest changes to commit"
           else
             git commit -m "ci: deploy ${{ github.sha }}"
+            git fetch origin main
+            git rebase origin/main
             git push
           fi
